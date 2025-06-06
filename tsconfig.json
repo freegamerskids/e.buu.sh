@@ -9,7 +9,14 @@
       "ESNext",
       "DOM"
     ],
+    "types": [
+      "@cloudflare/workers-types/latest"
+    ],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
   },
+  "include": [
+    "./worker-configuration.d.ts",
+    "./src/**/*"
+  ]
 }

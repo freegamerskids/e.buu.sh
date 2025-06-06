@@ -1,4 +1,5 @@
 import { MetaTags } from "../types";
+import { b64Encode } from "../util";
 
 export const REGEX = /^(https?:\/\/)?(.*\.)?tiktok\.com\/.*/;
 
@@ -22,6 +23,7 @@ interface TiktokRes {
             nickname: string,
             unique_id: string,
         },
+        id_str: string,
         desc: string,
         statistics_info: {
             share_count: number,
@@ -29,7 +31,19 @@ interface TiktokRes {
             digg_count: number,
         },
         video_info: {
+            meta: {
+                duration: number,
+            }
             url_list: string[],
+        },
+        image_post_info?: {
+            images: {
+                display_image: {
+                    height: number,
+                    width: number,
+                    url_list: string[],
+                }
+            }[],
         }
     }[]
 }
@@ -51,12 +65,29 @@ export async function meta(url: URL): Promise<MetaTags> {
     return {
         title: `${item.author_info.nickname} (@${item.author_info.unique_id})`,
         description: item.desc,
-        type: 'video',
-        media: item.video_info.url_list[0],
+        type: item.video_info.meta.duration === 0 ? 'image' : 'video',
+        media: item.video_info.meta.duration === 0 ? `/stitch/${b64Encode(JSON.stringify({
+            p: 'TikTok',
+            id: item.id_str,
+        }))}` : item.video_info.url_list[0],
         oembed: {
             provider_name: `${stats} / Provided by e.buu.sh`,
             provider_url: 'https://e.buu.sh'
         },
         url: og_url,
     }
+}
+
+export async function images(id: string) {
+    const res = await fetch(`https://www.tiktok.com/player/api/v1/items?item_ids=${id}`, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+    })
+    const data = await res.json() as TiktokRes
+    const item = data.items[0]
+
+    if (!item.image_post_info) return []
+
+    return item.image_post_info.images.map(image => ({ url: image.display_image.url_list[0], width: image.display_image.width, height: image.display_image.height }))
 }

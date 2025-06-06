@@ -5,9 +5,11 @@
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
+    "@cf-wasm/photon": "^0.1.30",
     "hono": "^4.7.11"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250606.0",
     "@types/node": "^22.15.29",
     "wrangler": "^4.4.0"
   }
