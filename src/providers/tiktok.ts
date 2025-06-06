@@ -66,7 +66,7 @@ export async function meta(url: URL): Promise<MetaTags> {
         title: `${item.author_info.nickname} (@${item.author_info.unique_id})`,
         description: item.desc,
         type: item.video_info.meta.duration === 0 ? 'image' : 'video',
-        media: item.video_info.meta.duration === 0 ? `/stitch/${b64Encode(JSON.stringify({
+        media: item.video_info.meta.duration === 0 ? `https://e.buu.sh/stitch/${b64Encode(JSON.stringify({
             p: 'TikTok',
             id: item.id_str,
         }))}` : item.video_info.url_list[0],
