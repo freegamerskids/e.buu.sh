@@ -48,17 +48,31 @@ interface TiktokRes {
     }[]
 }
 
-export async function meta(url: URL): Promise<MetaTags> {
-    const og_url = await redirect(url)
-
-    const og_res = await fetch(`https://www.tiktok.com/player/api/v1/items?item_ids=${url.pathname.split('/').pop()}`, {
+async function fetchVideoData(id: string) {
+    const og_res = await fetch(`https://www.tiktok.com/player/api/v1/items?item_ids=${id}`, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        cf: {
+            cacheEverything: false,
+            cacheTtlByStatus: {
+                '200-299': 60 * 60 * 24,
+                '404': 1,
+                '500-599': 0,
+            }
         }
     })
 
     const res = await og_res.json() as TiktokRes
     const item = res.items[0]
+
+    return item
+}
+
+export async function meta(url: URL): Promise<MetaTags> {
+    const og_url = await redirect(url)
+
+    const item = await fetchVideoData(url.pathname.split('/').pop()!)
 
     const stats = `${item.statistics_info.digg_count} ❤️ ${item.statistics_info.comment_count} 💬 ${item.statistics_info.share_count} 🔁`;
 
@@ -79,13 +93,7 @@ export async function meta(url: URL): Promise<MetaTags> {
 }
 
 export async function images(id: string) {
-    const res = await fetch(`https://www.tiktok.com/player/api/v1/items?item_ids=${id}`, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-    })
-    const data = await res.json() as TiktokRes
-    const item = data.items[0]
+    const item = await fetchVideoData(id)
 
     if (!item.image_post_info) return []
 

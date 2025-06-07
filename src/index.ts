@@ -18,6 +18,10 @@ const providers = [
 
 app.get('/:url{.*}', async (c) => {
   let url: string | URL = c.req.param('url')
+  if (!/^(https?:\/\/)/.test(url)) {
+    url = `https://${url}`
+  }
+
   try {
     url = new URL(url)
   } catch (e) {
@@ -36,7 +40,7 @@ app.get('/:url{.*}', async (c) => {
 
       let oembed = {
         ...meta.oembed,
-        author_name: description,
+        author_name: meta.type === 'image' ? '' : description,
         title: provider.name
       }
 
@@ -97,7 +101,6 @@ app.get('/stitch/:id', async (c) => {
   if (images.length === 1) return c.redirect(images[0].url)
 
   try {
-    // Load all images
     const photonImages = await Promise.all(
       images.map(async (image) => {
         const res = await fetch(image.url)
@@ -134,7 +137,6 @@ app.get('/stitch/:id', async (c) => {
     const totalWidth = Math.max(...rowWidths)
     const totalHeight = rowHeights.reduce((sum, height) => sum + height, 0)
 
-    // Create a new image with the combined dimensions
     const stitchedImage = new PhotonImage(new Uint8Array(totalWidth * totalHeight * 4), totalWidth, totalHeight)
 
     let yOffset = 0
