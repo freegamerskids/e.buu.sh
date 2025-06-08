@@ -14,7 +14,7 @@ export async function redirect(og_url: URL) {
         url = new URL(redir.headers.get('location') || '')
     }
 
-    return `https://${url.hostname}${url.pathname}`
+    return new URL(`https://${url.hostname}${url.pathname}`)
 }
 
 interface TiktokRes {
@@ -72,7 +72,7 @@ async function fetchVideoData(id: string) {
 export async function meta(url: URL): Promise<MetaTags> {
     const og_url = await redirect(url)
 
-    const item = await fetchVideoData(url.pathname.split('/').pop()!)
+    const item = await fetchVideoData(og_url.pathname.split('/').pop()!)
 
     const stats = `${item.statistics_info.digg_count} ❤️ ${item.statistics_info.comment_count} 💬 ${item.statistics_info.share_count} 🔁`;
 
@@ -88,7 +88,7 @@ export async function meta(url: URL): Promise<MetaTags> {
             provider_name: `${stats} / Provided by e.buu.sh`,
             provider_url: 'https://e.buu.sh'
         },
-        url: og_url,
+        url: og_url.toString(),
     }
 }
 
