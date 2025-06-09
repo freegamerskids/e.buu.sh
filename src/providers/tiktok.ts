@@ -1,5 +1,5 @@
 import { MetaTags } from "../types";
-import { b64Encode } from "../util";
+import { b64Encode, simplifyNumber } from "../util";
 
 export const REGEX = /^(https?:\/\/)?(.*\.)?tiktok\.com\/.*/;
 
@@ -91,7 +91,7 @@ export async function meta(url: URL): Promise<MetaTags> {
 
     const [item] = await fetchVideoData(og_url)
 
-    const stats = `${item.stats.diggCount} ❤️ ${item.stats.commentCount} 💬 ${item.stats.collectCount} 🔖 ${item.stats.shareCount} 🔁 ${item.stats.playCount} 👁️`;
+    const stats = `${simplifyNumber(item.stats.diggCount)} ❤️ ${simplifyNumber(item.stats.commentCount)} 💬 ${simplifyNumber(item.stats.collectCount)} 🔖 ${simplifyNumber(item.stats.shareCount)} 🔁 ${simplifyNumber(item.stats.playCount)} 👁️`;
 
     return {
         title: `${item.author.nickname} (@${item.author.uniqueId})`,

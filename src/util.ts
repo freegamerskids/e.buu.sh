@@ -18,3 +18,20 @@ export function b64Decode(str: string) {
 			.join(""),
 	);
 }
+
+export function simplifyNumber(num: number): string {
+	const units = ['', 'K', 'M', 'B', 'T'];
+	const order = Math.floor(Math.log10(Math.abs(num)) / 3);
+	
+	if (order < 0) return num.toString();
+	if (order >= units.length) return num.toString();
+	
+	const divisor = Math.pow(10, order * 3);
+	const simplified = (num / divisor).toFixed(1);
+	
+	const formatted = simplified.endsWith('.0') 
+		? simplified.slice(0, -2) 
+		: simplified;
+		
+	return formatted + units[order];
+}
