@@ -3,7 +3,7 @@ import { PhotonImage, watermark } from '@cf-wasm/photon'
 
 const app = new Hono()
 
-import { REGEX as TIKTOK_REGEX, meta as TIKTOK_META, redirect as TIKTOK_REDIRECT, images as TIKTOK_IMAGES, json as TIKTOK_JSON } from './providers/tiktok'
+import { REGEX as TIKTOK_REGEX, meta as TIKTOK_META, redirect as TIKTOK_REDIRECT, images as TIKTOK_IMAGES, json as TIKTOK_JSON, video as TIKTOK_VIDEO } from './providers/tiktok'
 import { b64Decode, b64Encode } from './util'
 
 const providers = [
@@ -14,6 +14,7 @@ const providers = [
     redirect: TIKTOK_REDIRECT,
     images: TIKTOK_IMAGES,
     json: TIKTOK_JSON,
+    video: TIKTOK_VIDEO,
   }
 ]
 
@@ -186,6 +187,15 @@ app.get('/stitch/:id', async (c) => {
     console.error('Error stitching images:', error)
     return c.text('Error processing images', 500)
   }
+})
+
+app.get('/video/:id', async (c) => {
+  const id = c.req.param('id')
+  const data = JSON.parse(b64Decode(id))
+  const provider = providers.find(p => p.name === data.p)
+  if (!provider) return c.text('Invalid provider', 404)
+  const video = await provider.video(data.id)
+  return video
 })
 
 app.get('/', (c) => {

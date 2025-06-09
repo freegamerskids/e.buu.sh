@@ -25,7 +25,7 @@ interface TiktokRes {
     author: {
         id: string,
         nickname: string,
-        unique_id: string,
+        uniqueId: string,
         signature: string,
         avatarLarger: string,
     },
@@ -60,7 +60,7 @@ interface TiktokRes {
     }
 }
 
-async function fetchVideoData(url: string) {
+async function fetchVideoData(url: string): Promise<[TiktokRes, string]> {
     const og_res = await fetch(url, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -75,26 +75,35 @@ async function fetchVideoData(url: string) {
         }
     })
 
+    let cookies: string = '';
+    for (const header of og_res.headers.getSetCookie()) {
+        let cookie = header.split(';')[0];
+        cookies += `${cookie}; `;
+    }
+
     const res = await og_res.text()
 
-    return JSON.parse(res.split('<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">')[1].split('</script>')[0])["__DEFAULT_SCOPE__"]["webapp.video-detail"]["itemInfo"]["itemStruct"] as TiktokRes
+    return [JSON.parse(res.split('<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">')[1].split('</script>')[0])["__DEFAULT_SCOPE__"]["webapp.video-detail"]["itemInfo"]["itemStruct"] as TiktokRes, cookies]
 }
 
 export async function meta(url: URL): Promise<MetaTags> {
     const og_url = await redirect(url)
 
-    const item = await fetchVideoData(og_url)
+    const [item] = await fetchVideoData(og_url)
 
     const stats = `${item.stats.diggCount} ❤️ ${item.stats.commentCount} 💬 ${item.stats.collectCount} 🔖 ${item.stats.shareCount} 🔁 ${item.stats.playCount} 👁️`;
 
     return {
-        title: `${item.author.nickname} (@${item.author.unique_id})`,
+        title: `${item.author.nickname} (@${item.author.uniqueId})`,
         description: item.desc,
         type: item.video.duration === 0 ? 'image' : 'video',
         media: item.video.duration === 0 ? `https://e.buu.sh/stitch/${b64Encode(JSON.stringify({
             p: 'TikTok',
-            id: item.id,
-        }))}` : item.video.playAddr,
+            id: og_url.toString(),
+        }))}` : `https://e.buu.sh/video/${b64Encode(JSON.stringify({
+            p: 'TikTok',
+            id: og_url.toString(),
+        }))}`,
         oembed: {
             provider_name: `${stats} / Provided by e.buu.sh`,
             provider_url: 'https://e.buu.sh'
@@ -104,23 +113,46 @@ export async function meta(url: URL): Promise<MetaTags> {
 }
 
 export async function images(id: string) {
-    const item = await fetchVideoData(id)
+    const [item] = await fetchVideoData(id)
 
     if (!item.imagePost) return []
 
     return item.imagePost.images.map(image => ({ url: image.imageURL.urlList[0], width: image.imageWidth, height: image.imageHeight }))
 }
 
+export async function video(id: string) {
+    const [item, cookies] = await fetchVideoData(id)
+
+    return await fetch(item.video.playAddr, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://www.tiktok.com/',
+            'Range': 'bytes=0-',
+            'Cookie': cookies,
+        },
+        cf: {
+            cacheEverything: false,
+            cacheTtlByStatus: {
+                '200-299': 60 * 60 * 24,
+                '404': 1,
+                '500-599': 0,
+            }
+        }
+    })
+}
+
 export async function json(url: URL): Promise<TiktokRes> {
     const og_url = await redirect(url)
 
-    const { author, id, desc, stats, video, music, imagePost } = await fetchVideoData(og_url)
+    const [item] = await fetchVideoData(og_url)
+
+    const { author, id, desc, stats, video, music, imagePost } = item
 
     return {
         author: {
             id: author.id,
             nickname: author.nickname,
-            unique_id: author.unique_id,
+            uniqueId: author.uniqueId,
             signature: author.signature,
             avatarLarger: author.avatarLarger,
         },
@@ -135,7 +167,10 @@ export async function json(url: URL): Promise<TiktokRes> {
         },
         video: {
             duration: video.duration,
-            playAddr: video.playAddr,
+            playAddr: video.duration === 0 ? '' : `https://e.buu.sh/video/${b64Encode(JSON.stringify({
+                p: 'TikTok',
+                id: og_url.toString(),
+            }))}`,
         },
         music: {
             id: music.id,
