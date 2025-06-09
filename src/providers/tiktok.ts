@@ -14,42 +14,54 @@ export async function redirect(og_url: URL) {
         url = new URL(redir.headers.get('location') || '')
     }
 
-    return new URL(`https://${url.hostname}${url.pathname}`)
+    if (url.pathname.includes('/photo')){
+        url = new URL(url.toString().replace('/photo', '/video'))
+    }
+
+    return `https://${url.hostname}${url.pathname}`
 }
 
 interface TiktokRes {
-    items: {
-        author_info: {
-            nickname: string,
-            unique_id: string,
-        },
-        id_str: string,
-        desc: string,
-        statistics_info: {
-            share_count: number,
-            comment_count: number,
-            digg_count: number,
-        },
-        video_info: {
-            meta: {
-                duration: number,
-            }
-            url_list: string[],
-        },
-        image_post_info?: {
-            images: {
-                display_image: {
-                    height: number,
-                    width: number,
-                    url_list: string[],
-                }
-            }[],
-        }
-    }[]
+    author: {
+        id: string,
+        nickname: string,
+        unique_id: string,
+        signature: string,
+        avatarLarger: string,
+    },
+    id: string,
+    desc: string,
+    stats: {
+        shareCount: number,
+        commentCount: number,
+        diggCount: number,
+        playCount: number,
+        collectCount: number,
+    },
+    video: {
+        duration: number,
+        playAddr: string,
+    },
+    music: {
+        id: string,
+        title: string,
+        playUrl: string,
+        coverLarge: string,
+        authorName: string,
+    },
+    imagePost?: {
+        images: {
+            imageURL: {
+                urlList: string[],
+            },
+            imageWidth: number,
+            imageHeight: number,
+        }[],
+    }
 }
 
-async function fetchVideoData(id: string) {
-    const og_res = await fetch(`https://www.tiktok.com/player/api/v1/items?item_ids=${id}`, {
+async function fetchVideoData(url: string) {
+    const og_res = await fetch(url, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         },
@@ -63,27 +75,26 @@ async function fetchVideoData(id: string) {
         }
     })
 
-    const res = await og_res.json() as TiktokRes
-    const item = res.items[0]
+    const res = await og_res.text()
 
-    return item
+    return JSON.parse(res.split('<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">')[1].split('</script>')[0])["__DEFAULT_SCOPE__"]["webapp.video-detail"]["itemInfo"]["itemStruct"] as TiktokRes
 }
 
 export async function meta(url: URL): Promise<MetaTags> {
     const og_url = await redirect(url)
 
-    const item = await fetchVideoData(og_url.pathname.split('/').pop()!)
+    const item = await fetchVideoData(og_url)
 
-    const stats = `${item.statistics_info.digg_count} ❤️ ${item.statistics_info.comment_count} 💬 ${item.statistics_info.share_count} 🔁`;
+    const stats = `${item.stats.diggCount} ❤️ ${item.stats.commentCount} 💬 ${item.stats.collectCount} 🔖 ${item.stats.shareCount} 🔁 ${item.stats.playCount} 👁️`;
 
     return {
-        title: `${item.author_info.nickname} (@${item.author_info.unique_id})`,
+        title: `${item.author.nickname} (@${item.author.unique_id})`,
         description: item.desc,
-        type: item.video_info.meta.duration === 0 ? 'image' : 'video',
-        media: item.video_info.meta.duration === 0 ? `https://e.buu.sh/stitch/${b64Encode(JSON.stringify({
+        type: item.video.duration === 0 ? 'image' : 'video',
+        media: item.video.duration === 0 ? `https://e.buu.sh/stitch/${b64Encode(JSON.stringify({
             p: 'TikTok',
-            id: item.id_str,
-        }))}` : item.video_info.url_list[0],
+            id: item.id,
+        }))}` : item.video.playAddr,
         oembed: {
             provider_name: `${stats} / Provided by e.buu.sh`,
             provider_url: 'https://e.buu.sh'
@@ -95,7 +106,52 @@ export async function meta(url: URL): Promise<MetaTags> {
 export async function images(id: string) {
     const item = await fetchVideoData(id)
 
-    if (!item.image_post_info) return []
+    if (!item.imagePost) return []
 
-    return item.image_post_info.images.map(image => ({ url: image.display_image.url_list[0], width: image.display_image.width, height: image.display_image.height }))
+    return item.imagePost.images.map(image => ({ url: image.imageURL.urlList[0], width: image.imageWidth, height: image.imageHeight }))
+}
+
+export async function json(url: URL): Promise<TiktokRes> {
+    const og_url = await redirect(url)
+
+    const { author, id, desc, stats, video, music, imagePost } = await fetchVideoData(og_url)
+
+    return {
+        author: {
+            id: author.id,
+            nickname: author.nickname,
+            unique_id: author.unique_id,
+            signature: author.signature,
+            avatarLarger: author.avatarLarger,
+        },
+        id,
+        desc,
+        stats: {
+            shareCount: stats.shareCount,
+            commentCount: stats.commentCount,
+            diggCount: stats.diggCount,
+            playCount: stats.playCount,
+            collectCount: stats.collectCount,
+        },
+        video: {
+            duration: video.duration,
+            playAddr: video.playAddr,
+        },
+        music: {
+            id: music.id,
+            title: music.title,
+            playUrl: music.playUrl,
+            coverLarge: music.coverLarge,
+            authorName: music.authorName,
+        },
+        imagePost: imagePost ? {
+            images: imagePost.images.map(image => ({
+                imageURL: {
+                    urlList: image.imageURL.urlList,
+                },
+                imageWidth: image.imageWidth,
+                imageHeight: image.imageHeight,
+            })),
+        } : undefined,
+    }
 }

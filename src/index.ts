@@ -3,7 +3,7 @@ import { PhotonImage, watermark } from '@cf-wasm/photon'
 
 const app = new Hono()
 
-import { REGEX as TIKTOK_REGEX, meta as TIKTOK_META, redirect as TIKTOK_REDIRECT, images as TIKTOK_IMAGES } from './providers/tiktok'
+import { REGEX as TIKTOK_REGEX, meta as TIKTOK_META, redirect as TIKTOK_REDIRECT, images as TIKTOK_IMAGES, json as TIKTOK_JSON } from './providers/tiktok'
 import { b64Decode, b64Encode } from './util'
 
 const providers = [
@@ -13,6 +13,7 @@ const providers = [
     meta: TIKTOK_META,
     redirect: TIKTOK_REDIRECT,
     images: TIKTOK_IMAGES,
+    json: TIKTOK_JSON,
   }
 ]
 
@@ -30,6 +31,10 @@ app.get('/:url{.*}', async (c) => {
 
   for (const provider of providers) {
     if (provider.regex.test(url.toString())) {
+      if (c.req.header('Accept')?.includes('application/json') || c.req.header('Content-Type')?.includes('application/json')) {
+        return c.json(await provider.json(url))
+      }
+
       if (!c.req.header('User-Agent')?.toLowerCase().includes('bot')) {
         return c.redirect(await provider.redirect(url))
       }
@@ -184,7 +189,7 @@ app.get('/stitch/:id', async (c) => {
 })
 
 app.get('/', (c) => {
-  return c.html('Welcome to the <a href="https://buu.sh">buu.sh</a> embed service!')
+  return c.html('<div>Welcome to the <a href="https://buu.sh">buu.sh</a> embed service!</div><br/><div>Add a <code>Accept: application/json</code> header to get JSON data.</div>')
 })
 
 export default app
