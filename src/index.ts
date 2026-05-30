@@ -194,7 +194,7 @@ app.get('/video/:id', async (c) => {
   const data = JSON.parse(b64Decode(id))
   const provider = providers.find(p => p.name === data.p)
   if (!provider) return c.text('Invalid provider', 404)
-  const video = await provider.video(data.id)
+  const video = await provider.video(data.id, data.i)
   return video
 })
 

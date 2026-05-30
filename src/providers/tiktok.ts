@@ -42,6 +42,12 @@ interface TiktokRes {
         duration: number,
         playAddr: string,
     },
+    bitrateInfo: {
+        Bitrate: number,
+        QualityType: number,
+        BitrateFPS: number,
+        PlayAddr: string[]
+    }[],
     music: {
         id: string,
         title: string,
@@ -103,6 +109,7 @@ export async function meta(url: URL): Promise<MetaTags> {
         }))}` : `https://e.buu.sh/video/${b64Encode(JSON.stringify({
             p: 'TikTok',
             id: og_url.toString(),
+            i: 0,
         }))}`,
         oembed: {
             provider_name: `${stats} / Provided by e.buu.sh`,
@@ -120,10 +127,10 @@ export async function images(id: string) {
     return item.imagePost.images.map(image => ({ url: image.imageURL.urlList[0], width: image.imageWidth, height: image.imageHeight }))
 }
 
-export async function video(id: string) {
+export async function video(id: string, index: number = 0) {
     const [item, cookies] = await fetchVideoData(id)
 
-    return await fetch(item.video.playAddr, {
+    return await fetch(item.bitrateInfo[index].PlayAddr[0], {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.tiktok.com/',
@@ -146,7 +153,7 @@ export async function json(url: URL): Promise<TiktokRes> {
 
     const [item] = await fetchVideoData(og_url)
 
-    const { author, id, desc, stats, video, music, imagePost } = item
+    const { author, id, desc, stats, video, music, imagePost, bitrateInfo } = item
 
     return {
         author: {
@@ -170,8 +177,19 @@ export async function json(url: URL): Promise<TiktokRes> {
             playAddr: video.duration === 0 ? '' : `https://e.buu.sh/video/${b64Encode(JSON.stringify({
                 p: 'TikTok',
                 id: og_url.toString(),
+                i: 0,
             }))}`,
         },
+        bitrateInfo: bitrateInfo.map(info => ({
+            Bitrate: info.Bitrate,
+            QualityType: info.QualityType,
+            BitrateFPS: info.BitrateFPS,
+            PlayAddr: info.PlayAddr.map((addr, i) => `https://e.buu.sh/video/${b64Encode(JSON.stringify({
+                p: 'TikTok',
+                id: og_url.toString(),
+                i,
+            }))}`),
+        })),
         music: {
             id: music.id,
             title: music.title,
