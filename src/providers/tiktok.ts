@@ -184,7 +184,7 @@ export async function json(url: URL): Promise<TiktokRes> {
             Bitrate: info.Bitrate,
             QualityType: info.QualityType,
             BitrateFPS: info.BitrateFPS,
-            PlayAddr: info.PlayAddr.map((addr, i) => `https://e.buu.sh/video/${b64Encode(JSON.stringify({
+            PlayAddr: (info.PlayAddr as unknown as { UrlList: string[] })['UrlList'].map((addr, i) => `https://e.buu.sh/video/${b64Encode(JSON.stringify({
                 p: 'TikTok',
                 id: og_url.toString(),
                 i,
