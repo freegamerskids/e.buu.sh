@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import { PhotonImage, watermark } from '@cf-wasm/photon'
 
-const app = new Hono()
-
 import { REGEX as TIKTOK_REGEX, meta as TIKTOK_META, redirect as TIKTOK_REDIRECT, images as TIKTOK_IMAGES, json as TIKTOK_JSON, video as TIKTOK_VIDEO } from './providers/tiktok'
-import { b64Decode, b64Encode } from './util'
+import { b64Decode, b64Encode, decryptUrl, encryptUrl } from './util'
+
+const app = new Hono<{ Bindings: CloudflareBindings }>()
 
 const providers = [
   {
@@ -18,7 +18,7 @@ const providers = [
   }
 ]
 
-app.get('/:url{.*}', async (c) => {
+app.get('/share/:url{.*}', async (c) => {
   let url: string | URL = c.req.param('url')
   if (!/^(https?:\/\/)/.test(url)) {
     url = `https://${url}`
@@ -28,6 +28,47 @@ app.get('/:url{.*}', async (c) => {
     url = new URL(url)
   } catch (e) {
     return c.text('Invalid URL', 400)
+  }
+
+  for (const provider of providers) {
+    if (provider.regex.test(url.toString())) {
+      const key = c.env.ENCRYPTION_KEY
+      if (!key) return c.text('Encryption not configured', 500)
+
+      const encrypted = await encryptUrl(url.toString(), key)
+      return c.text(`https://e.buu.sh/${encrypted}`)
+    }
+  }
+
+  return c.text('No provider found', 404)
+})
+
+app.get('/:url{.*}', async (c) => {
+  let param = c.req.param('url')
+  let url: URL
+
+  if (/^(https?:\/\/)/.test(param)) {
+    try {
+      url = new URL(param)
+    } catch (e) {
+      return c.text('Invalid URL', 400)
+    }
+  } else if (c.env.ENCRYPTION_KEY) {
+    try {
+      url = new URL(await decryptUrl(param, c.env.ENCRYPTION_KEY))
+    } catch (e) {
+      try {
+        url = new URL(`https://${param}`)
+      } catch (e) {
+        return c.text('Invalid URL', 400)
+      }
+    }
+  } else {
+    try {
+      url = new URL(`https://${param}`)
+    } catch (e) {
+      return c.text('Invalid URL', 400)
+    }
   }
 
   for (const provider of providers) {
