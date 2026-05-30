@@ -46,7 +46,9 @@ interface TiktokRes {
         Bitrate: number,
         QualityType: number,
         BitrateFPS: number,
-        PlayAddr: string[]
+        PlayAddr: {
+            UrlList: string[],
+        }
     }[],
     music: {
         id: string,
@@ -130,7 +132,7 @@ export async function images(id: string) {
 export async function video(id: string, index: number = 0) {
     const [item, cookies] = await fetchVideoData(id)
 
-    return await fetch(item.bitrateInfo[index].PlayAddr[0], {
+    return await fetch(item.bitrateInfo[index].PlayAddr.UrlList[0], {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.tiktok.com/',
@@ -184,11 +186,13 @@ export async function json(url: URL): Promise<TiktokRes> {
             Bitrate: info.Bitrate,
             QualityType: info.QualityType,
             BitrateFPS: info.BitrateFPS,
-            PlayAddr: (info.PlayAddr as unknown as { UrlList: string[] })['UrlList'].map((addr, i) => `https://e.buu.sh/video/${b64Encode(JSON.stringify({
-                p: 'TikTok',
-                id: og_url.toString(),
-                i,
-            }))}`),
+            PlayAddr: {
+                UrlList: info.PlayAddr.UrlList.map((addr, i) => `https://e.buu.sh/video/${b64Encode(JSON.stringify({
+                    p: 'TikTok',
+                    id: og_url.toString(),
+                    i,
+                }))}`),
+            },
         })),
         music: {
             id: music.id,
