@@ -157,6 +157,8 @@ export async function json(url: URL): Promise<TiktokRes> {
 
     const { author, id, desc, stats, video, music, imagePost, bitrateInfo } = item
 
+    console.log(bitrateInfo)
+
     return {
         author: {
             id: author.id,
