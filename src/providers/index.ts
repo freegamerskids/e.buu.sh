@@ -21,7 +21,6 @@ const PROVIDERS = [
 ];
 
 export function getProvider(name: string) {
-    console.log(name)
     return PROVIDERS.find((p) => p.name === name)
 }
 
