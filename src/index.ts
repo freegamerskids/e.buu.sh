@@ -1,29 +1,10 @@
 import { Hono } from "hono";
 import { PhotonImage, watermark } from "@cf-wasm/photon";
 
-import {
-    REGEX as TIKTOK_REGEX,
-    meta as TIKTOK_META,
-    redirect as TIKTOK_REDIRECT,
-    images as TIKTOK_IMAGES,
-    json as TIKTOK_JSON,
-    video as TIKTOK_VIDEO,
-} from "./providers/tiktok";
+import { getProvider, getProviderFromRegex } from "./providers";
 import { b64Decode, b64Encode, decryptUrl, encryptUrl } from "./util";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
-
-const providers = [
-    {
-        regex: TIKTOK_REGEX,
-        name: "TikTok",
-        meta: TIKTOK_META,
-        redirect: TIKTOK_REDIRECT,
-        images: TIKTOK_IMAGES,
-        json: TIKTOK_JSON,
-        video: TIKTOK_VIDEO,
-    },
-];
 
 app.get("/share/:url{.*}", async (c) => {
     let url: string | URL = c.req.param("url");
@@ -37,14 +18,13 @@ app.get("/share/:url{.*}", async (c) => {
         return c.text("Invalid URL", 400);
     }
 
-    for (const provider of providers) {
-        if (provider.regex.test(url.toString())) {
-            const key = c.env.ENCRYPTION_KEY;
-            if (!key) return c.text("Encryption not configured", 500);
+    const p = getProviderFromRegex(url);
+    if (p) {
+        const key = c.env.ENCRYPTION_KEY;
+        if (!key) return c.text("Encryption not configured", 500);
 
-            const encrypted = await encryptUrl(url.toString(), key);
-            return c.text(`https://e.buu.sh/${encrypted}`);
-        }
+        const encrypted = await encryptUrl(url.toString(), key);
+        return c.text(`https://e.buu.sh/${encrypted}`);
     }
 
     return c.text("No provider found", 404);
@@ -55,12 +35,12 @@ app.get("/:url{.*}", async (c) => {
     let url: URL;
 
     // forgive me father for i have sinned
-    const a = param.split(".")
-    const extension = a.pop() || ""
-    let isJson = /json/g.test(extension)
-    let isMedia = /(mp4|webm|jpg|jpeg|png|webp|apng)/g.test(extension)
+    const a = param.split(".");
+    const extension = a.pop() || "";
+    let isJson = /json/g.test(extension);
+    let isMedia = /(mp4|webm|jpg|jpeg|png|webp|apng)/g.test(extension);
     if (isJson || isMedia) {
-        param = a.join(".")
+        param = a.join(".");
     }
 
     if (/^(https?:\/\/)/.test(param)) {
@@ -87,72 +67,71 @@ app.get("/:url{.*}", async (c) => {
         }
     }
 
-    for (const provider of providers) {
-        if (provider.regex.test(url.toString())) {
-            if (
-                c.req.header("Accept")?.includes("application/json") ||
-                c.req.header("Content-Type")?.includes("application/json") ||
-                isJson
-            ) {
-                return c.json(await provider.json(url));
-            }
-
-            if (!c.req.header("User-Agent")?.toLowerCase().includes("bot")) {
-                return c.redirect(await provider.redirect(url));
-            }
-
-            let meta = await provider.meta(url);
-
-            if (isMedia) {
-                return c.redirect(meta.media)
-            }
-
-            let description =
-                meta.description.substring(0, 197) +
-                (meta.description.length > 197 ? "..." : "");
-
-            let oembed = {
-                ...meta.oembed,
-                author_name: meta.type === "image" ? "" : description,
-                title: provider.name,
-            };
-
-            const tags = [
-                `<!doctype html><html lang="en-US"><head>`,
-
-                `<meta name="theme-color" content="#8100AB"/>`,
-
-                `<meta property="og:title" content="${meta.title}" />`,
-                `<meta property="og:description" content="${description}" />`,
-                meta.type === "image"
-                    ? `<meta property="og:image" content="${meta.media}" />`
-                    : `<meta property="og:video:url" content="${meta.media}" />`,
-                `<meta property="og:url" content="${meta.url}" />`,
-                `<meta property="og:type" content="${meta.type}" />`,
-                `<meta property="og:site_name" content="${meta.oembed.provider_name}" />`,
-                meta.type === "video"
-                    ? `<meta property="og:video:type" content="video/mp4" />`
-                    : "",
-
-                meta.type === "image"
-                    ? `<meta name="twitter:card" content="summary_large_image" />`
-                    : `<meta name="twitter:card" content="player" />`,
-                `<meta name="twitter:title" content="${meta.title}" />`,
-                `<meta name="twitter:description" content="${description}" />`,
-                meta.type === "image"
-                    ? `<meta name="twitter:image" content="${meta.media}" />`
-                    : `<meta name="twitter:player:stream" content="${meta.media}" />`,
-                meta.type === "video"
-                    ? `<meta name="twitter:player:stream:content_type" content="video/mp4" />`
-                    : "",
-
-                `<link rel="alternate" href="https://e.buu.sh/oembed/${b64Encode(JSON.stringify(oembed))}" type="application/json+oembed" title="${meta.title}">`,
-
-                `</head></html>`,
-            ];
-
-            return c.html(tags.join("\n"));
+    const p = getProviderFromRegex(url);
+    if (p) {
+        if (
+            c.req.header("Accept")?.includes("application/json") ||
+            c.req.header("Content-Type")?.includes("application/json") ||
+            isJson
+        ) {
+            return c.json(await p.json(url));
         }
+
+        if (!c.req.header("User-Agent")?.toLowerCase().includes("bot")) {
+            return c.redirect(await p.redirect(url));
+        }
+
+        let meta = await p.meta(url);
+
+        if (isMedia) {
+            return c.redirect(meta.media);
+        }
+
+        let description =
+            meta.description.substring(0, 197) +
+            (meta.description.length > 197 ? "..." : "");
+
+        let oembed = {
+            ...meta.oembed,
+            author_name: meta.type === "image" ? "" : description,
+            title: p.name,
+        };
+
+        const tags = [
+            `<!doctype html><html lang="en-US"><head>`,
+
+            `<meta name="theme-color" content="#8100AB"/>`,
+
+            `<meta property="og:title" content="${meta.title}" />`,
+            `<meta property="og:description" content="${description}" />`,
+            meta.type === "image"
+                ? `<meta property="og:image" content="${meta.media}" />`
+                : `<meta property="og:video:url" content="${meta.media}" />`,
+            `<meta property="og:url" content="${meta.url}" />`,
+            `<meta property="og:type" content="${meta.type}" />`,
+            `<meta property="og:site_name" content="${meta.oembed.provider_name}" />`,
+            meta.type === "video"
+                ? `<meta property="og:video:type" content="video/mp4" />`
+                : "",
+
+            meta.type === "image"
+                ? `<meta name="twitter:card" content="summary_large_image" />`
+                : `<meta name="twitter:card" content="player" />`,
+            `<meta name="twitter:title" content="${meta.title}" />`,
+            `<meta name="twitter:description" content="${description}" />`,
+            meta.type === "image"
+                ? `<meta name="twitter:image" content="${meta.media}" />`
+                : `<meta name="twitter:player:stream" content="${meta.media}" />`,
+            meta.type === "video"
+                ? `<meta name="twitter:player:stream:content_type" content="video/mp4" />`
+                : "",
+
+            `<link rel="alternate" href="https://e.buu.sh/oembed/${b64Encode(JSON.stringify(oembed))}" type="application/json+oembed" title="${meta.title}">`,
+
+            `</head></html>`,
+        ];
+
+        return c.html(tags.join("\n"));
     }
 
     return c.text("Invalid provider", 404);
@@ -180,7 +159,7 @@ app.get("/stitch/:id", async (c) => {
         return cachedResponse;
     }
 
-    const provider = providers.find((p) => p.name === data.p);
+    const provider = getProvider(data.p);
     if (!provider) return c.text("Invalid provider", 404);
 
     const images = await provider.images(data.id);
@@ -217,8 +196,12 @@ app.get("/stitch/:id", async (c) => {
         numColumns = Math.max(1, numColumns);
 
         const numRows = Math.ceil(photonImages.length / numColumns);
-        const rowWidths: number[] = Array.from<number>({ length: numRows }).fill(0);
-        const rowHeights: number[] = Array.from<number>({ length: numRows }).fill(0);
+        const rowWidths: number[] = Array.from<number>({
+            length: numRows,
+        }).fill(0);
+        const rowHeights: number[] = Array.from<number>({
+            length: numRows,
+        }).fill(0);
 
         for (let i = 0; i < photonImages.length; i++) {
             const rowIndex = Math.floor(i / numColumns);
@@ -294,8 +277,8 @@ app.get("/stitch/:id", async (c) => {
 app.get("/video/:id", async (c) => {
     const id = c.req.param("id");
     const data = JSON.parse(b64Decode(id));
-    const provider = providers.find((p) => p.name === data.p);
-    console.log(provider)
+    const provider = getProvider(data.p);
+    console.log(provider);
     if (!provider) return c.text("Invalid provider", 404);
     return provider.video(data.id, data.i);
 });
