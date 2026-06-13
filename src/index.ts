@@ -295,6 +295,7 @@ app.get("/video/:id", async (c) => {
     const id = c.req.param("id");
     const data = JSON.parse(b64Decode(id));
     const provider = providers.find((p) => p.name === data.p);
+    console.log(provider)
     if (!provider) return c.text("Invalid provider", 404);
     return provider.video(data.id, data.i);
 });
