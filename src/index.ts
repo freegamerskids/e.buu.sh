@@ -301,7 +301,14 @@ app.get("/video/:id", async (c) => {
 
 app.get("/", (c) => {
     return c.html(
-        '<!doctype html><html><body><div>Welcome to the <a href="https://buu.sh">buu.sh</a> embed service!</div><br/><div>Add a <code>Accept: application/json</code> header to get JSON data.</div></body></html>',
+        `<!doctype html><html><body>
+            <div>Welcome to the <a href="https://buu.sh">buu.sh</a> embed service!</div>
+            <br/>
+            <div>Add a <code>Accept: application/json</code> header or add <code>.json</code> to the end of the url to get JSON data.</div>
+            <div>Similiarly, add <code>.mp4</code> or <code>.jpg</code> to the end of the url to only get the media.</div>
+            <br/>
+            <div>Source code is available on <a href="https://github.com/freegamerskids/e.buu.sh" target="_blank">GitHub</a>.</div>
+        </body></html>`,
     );
 });
 
