@@ -132,7 +132,7 @@ export async function images(id: string) {
 export async function video(id: string, index: number = 0) {
     const [item, cookies] = await fetchVideoData(id)
 
-    return await fetch(item.video.bitrateInfo[index].PlayAddr.UrlList[0], {
+    const req = await fetch(item.video.bitrateInfo[index].PlayAddr.UrlList[0], {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Referer': 'https://www.tiktok.com/',
@@ -146,6 +146,14 @@ export async function video(id: string, index: number = 0) {
                 '404': 1,
                 '500-599': 0,
             }
+        }
+    })
+
+    return new Response(req.body, {
+        headers: {
+            "content-type": req.headers.get("content-type") || "video/mp4",
+            "content-length": req.headers.get("content-length") || "",
+            "cache-control": "public, max-age=31536000"
         }
     })
 }
